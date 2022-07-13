@@ -15,6 +15,32 @@ def lookup(ulPropID):
     else:
         return hex(ulPropID)
 
+def gettype(PropID):
+    # The property type is infered from the last 2 bytes of PropID
+    typebytes = PropID[-4:]
+    if typebytes == "0003":
+        return "PtypInteger32"
+    if typebytes == "000B":
+        return "PtypBoolean"
+    if typebytes == "000D":
+        return "PtypObject"
+    if typebytes == "001E":
+        return "PtypString8"
+    if typebytes == "001F":
+        return "PtypString"
+    if typebytes == "0102":
+        return "PtypBinary"
+    if typebytes == "1003":
+        return "PtypMultipleInteger32"
+    if typebytes == "101E":
+        return "PtypMultipleString8"
+    if typebytes == "101F":
+        return "PtypMultipleString"
+    if typebytes == "1102":
+        return "PtypMultipleBinary"
+    return "Unknown(ProdID=%s)" % PropID
+
+# Custom JSON encoder to encode bytes
 class BytesEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, bytes):
@@ -96,12 +122,16 @@ with open('udetails.oab', 'rb') as f:
             # check if attribute is present for this entry
             if presenceBitArrayStr[i] == "0":
                 continue
+            # Get PropID
             PropID = hexify(OAB_Atts[i])
+            # If PropID not in schema, name it Unknown(PropID)
             if PropID not in PidTagSchema:
-                raise Exception( "This property id (" + PropID + ") does not exist in the schema" )
-
-            (Name, Type) = PidTagSchema[PropID]
-
+                Name = "Unknown(%s)" % PropID
+            else:
+                Name = PidTagSchema[PropID]
+            # Get Type from PropID
+            Type = gettype(PropID)
+            # Extract value based on attribute type
             if Type == "PtypString8" or Type == "PtypString":
                 val = read_str()
                 rec[Name] = val
@@ -152,11 +182,11 @@ with open('udetails.oab', 'rb') as f:
                     print(i, "\t", bin_len, binascii.b2a_hex(bin))
                 rec[Name] = arr
             else:
-                raise "Unknown property type (" + Type + ")"
+                raise Exception("Unknown property type (" + Type + ")")
                 
         remains = chunk.read()
         if len(remains) > 0:
-            raise "This record contains unexpected data at the end: " + remains
+            raise Exception("This record contains unexpected data at the end: " + remains)
         
         json_out.write(json.dumps(rec, cls=BytesEncoder) + '\n')
         
