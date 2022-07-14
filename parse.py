@@ -5,6 +5,9 @@ import binascii
 from schema import PidTagSchema
 import json
 
+# [MS-OXOAB]: Offline Address Book (OAB) File Format and Schema
+# https://interoperability.blob.core.windows.net/files/MS-OXOAB/%5bMS-OXOAB%5d.pdf
+
 def hexify(PropID):
     return "{0:#0{1}x}".format(PropID, 10).upper()[2:]
 
@@ -103,8 +106,7 @@ with open('udetails.oab', 'rb') as f:
                 if n == b"\0" or n == b"":
                     break
                 buf += n
-            return buf
-            # return unicode(buf, errors="ignore")
+            return buf.decode("utf-8")
 
         def read_int():
             # integers are cool aren't they
@@ -135,51 +137,52 @@ with open('udetails.oab', 'rb') as f:
             if Type == "PtypString8" or Type == "PtypString":
                 val = read_str()
                 rec[Name] = val
-                print(Name, val)
+                print("%s (%s) : %s" % (Name,Type,val))
             elif Type == "PtypBoolean":
                 val = unpack('<?', chunk.read(1))[0]
                 rec[Name] = val
-                print(Name, val)
+                print("%s (%s) : %s" % (Name,Type,val))
             elif Type == "PtypInteger32":
                 val = read_int()
                 rec[Name] = val
-                print(Name, val)
+                print("%s (%s) : %s" % (Name,Type,val))
             elif Type == "PtypBinary":
                 bin = chunk.read(read_int())
                 rec[Name] = binascii.b2a_hex(bin)
-                print(Name, len(bin), binascii.b2a_hex(bin))
+                print("%s (%s) len=%s %s" % (Name, Type, len(bin), binascii.b2a_hex(bin)))
             elif Type == "PtypMultipleString" or Type == "PtypMultipleString8":
                 byte_count = read_int()
-                print(Name, byte_count)
+                print("%s (%s[%s])" % (Name,Type,byte_count))
                 arr = []
                 for i in range(byte_count):
                     val = read_str()
                     arr.append(val)
-                    print(i, "\t", val)
+                    print("\t(%s) %s" % (i,val))
                 rec[Name] = arr
             elif Type == "PtypMultipleInteger32":
                 byte_count = read_int()
-                print(Name, byte_count)
+                print("%s (%s[%s])" % (Name,Type,byte_count))
                 arr = []
                 for i in range(byte_count):
                     val = read_int()
                     if Name == "OfflineAddressBookTruncatedProperties":
                         val = hexify(val)
                         if val in PidTagSchema:
-                            val = PidTagSchema[val][0]
+                            val = PidTagSchema[val]
+                        else:
+                            val = "Unknown(%s)" % val
                     arr.append(val)
-                    print(i, "\t", val)
-
+                    print("\t(%s) %s" % (i,val))
                 rec[Name] = arr
             elif Type == "PtypMultipleBinary":
                 byte_count = read_int()
-                print(Name, byte_count)
+                print("%s (%s[%s])" % (Name,Type,byte_count))
                 arr = []
                 for i in range(byte_count):
                     bin_len = read_int()
                     bin = chunk.read(bin_len)
                     arr.append(binascii.b2a_hex(bin))
-                    print(i, "\t", bin_len, binascii.b2a_hex(bin))
+                    print("\t(%s) len=%s %s" % (i,bin_len, binascii.b2a_hex(bin)))
                 rec[Name] = arr
             else:
                 raise Exception("Unknown property type (" + Type + ")")
